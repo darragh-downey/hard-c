@@ -1,7 +1,18 @@
 #include <stdlib.h>
 #include <limits.h>
 
-// Safely returns the absolute value of a given integer.
+
+/**
+ * @file abs.c
+ * @brief Implementation of the absolute value function for integers.
+ *
+ * This file contains the implementation of the abs function, which computes
+ * the absolute value of an integer. The function handles the special case
+ * where the input is INT_MIN, as flipping INT_MIN results in INT_MIN.
+ *
+ * @param a The integer value for which the absolute value is to be computed.
+ * @return The absolute value of the input integer.
+ */
 int abs(int a)
 {
 	// flipping INT_MIN results in INT_MIN, so we need to handle it separately
