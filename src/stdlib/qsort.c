@@ -32,31 +32,71 @@
 #include "atomic.h"
 #define ntz(x) a_ctz_l((x))
 
+/**
+ * @typedef cmpfun
+ * @brief A function pointer type for comparison functions used in sorting algorithms.
+ *
+ * This type defines a pointer to a comparison function that takes three arguments:
+ * - Two `const void *` pointers representing the elements to be compared.
+ * - A `void *` pointer representing additional user data.
+ *
+ * The comparison function should return an integer less than, equal to, or greater than zero
+ * if the first element is considered to be respectively less than, equal to, or greater than the second element.
+ */
 typedef int (*cmpfun)(const void *, const void *, void *);
 
-static inline int pntz(size_t p[2]) {
+/**
+ * @brief Calculate the position number of trailing zeros in a size_t array.
+ *
+ * This function calculates the position number of trailing zeros in a
+ * two-element size_t array. It first checks the number of trailing zeros
+ * in the first element. If the result is non-zero, it returns that value.
+ * Otherwise, it calculates the number of trailing zeros in the second
+ * element, adjusted by the size of size_t in bits, and returns that value
+ * if it is not equal to the size of size_t in bits.
+ *
+ * @param p A two-element array of size_t.
+ * @return The position number of trailing zeros.
+ */
+static inline int pntz(size_t p[2])
+{
 	int r = ntz(p[0] - 1);
-	if(r != 0 || (r = 8*sizeof(size_t) + ntz(p[1])) != 8*sizeof(size_t)) {
+	if (r != 0 || (r = 8 * sizeof(size_t) + ntz(p[1])) != 8 * sizeof(size_t))
+	{
 		return r;
 	}
 	return 0;
 }
 
-static void cycle(size_t width, unsigned char* ar[], int n)
+/**
+ * @brief Performs a cyclic permutation of an array of pointers to unsigned char arrays.
+ *
+ * This function takes an array of pointers to unsigned char arrays and performs a cyclic
+ * permutation of the elements. The permutation is done in chunks of size `width` bytes.
+ *
+ * @param width The number of bytes to be cycled in each iteration.
+ * @param ar An array of pointers to unsigned char arrays. The array must have space for
+ *           `n + 1` elements, where the last element is used as temporary storage.
+ * @param n The number of elements in the array to be cycled.
+ */
+static void cycle(size_t width, unsigned char *ar[], int n)
 {
 	unsigned char tmp[256];
 	size_t l;
 	int i;
 
-	if(n < 2) {
+	if (n < 2)
+	{
 		return;
 	}
 
 	ar[n] = tmp;
-	while(width) {
+	while (width)
+	{
 		l = sizeof(tmp) < width ? sizeof(tmp) : width;
 		memcpy(ar[n], ar[0], l);
-		for(i = 0; i < n; i++) {
+		for (i = 0; i < n; i++)
+		{
 			memcpy(ar[i], ar[i + 1], l);
 			ar[i] += l;
 		}
@@ -64,10 +104,21 @@ static void cycle(size_t width, unsigned char* ar[], int n)
 	}
 }
 
+/**
+ * @brief Perform a left shift on a 128-bit integer represented by two size_t values.
+ *
+ * This function shifts the 128-bit integer represented by the array `p` to the left by `n` bits.
+ * The integer is stored in `p` as two size_t values, with `p[0]` being the lower part and `p[1]`
+ * being the upper part.
+ *
+ * @param p An array of two size_t values representing the 128-bit integer to be shifted.
+ * @param n The number of bits to shift the integer to the left. Must be greater than 0.
+ */
 /* shl() and shr() need n > 0 */
 static inline void shl(size_t p[2], int n)
 {
-	if(n >= 8 * sizeof(size_t)) {
+	if (n >= 8 * sizeof(size_t))
+	{
 		n -= 8 * sizeof(size_t);
 		p[1] = p[0];
 		p[0] = 0;
@@ -77,9 +128,20 @@ static inline void shl(size_t p[2], int n)
 	p[0] <<= n;
 }
 
+/**
+ * @brief Performs a bitwise right shift on a pair of size_t values.
+ *
+ * This function shifts the bits of the two-element array `p` to the right by `n` positions.
+ * If `n` is greater than or equal to the number of bits in a size_t, the function adjusts
+ * the shift amount and moves the higher-order bits from `p[1]` to `p[0]`.
+ *
+ * @param p A two-element array of size_t values to be shifted.
+ * @param n The number of positions to shift the bits to the right.
+ */
 static inline void shr(size_t p[2], int n)
 {
-	if(n >= 8 * sizeof(size_t)) {
+	if (n >= 8 * sizeof(size_t))
+	{
 		n -= 8 * sizeof(size_t);
 		p[0] = p[1];
 		p[1] = 0;
@@ -89,6 +151,20 @@ static inline void shr(size_t p[2], int n)
 	p[1] >>= n;
 }
 
+/**
+ * @brief Sifts down the heap to restore the heap property.
+ *
+ * This function is used in the heapsort algorithm to maintain the heap property
+ * by sifting down the element at the given position. It compares the element
+ * with its children and swaps it with the larger child if necessary.
+ *
+ * @param head Pointer to the current element in the heap.
+ * @param width Size of each element in the heap.
+ * @param cmp Comparison function used to compare elements.
+ * @param arg Additional argument passed to the comparison function.
+ * @param pshift Current position shift in the heap.
+ * @param lp Array of sizes of left subtrees.
+ */
 static void sift(unsigned char *head, size_t width, cmpfun cmp, void *arg, int pshift, size_t lp[])
 {
 	unsigned char *rt, *lf;
@@ -96,18 +172,23 @@ static void sift(unsigned char *head, size_t width, cmpfun cmp, void *arg, int p
 	int i = 1;
 
 	ar[0] = head;
-	while(pshift > 1) {
+	while (pshift > 1)
+	{
 		rt = head - width;
 		lf = head - width - lp[pshift - 2];
 
-		if(cmp(ar[0], lf, arg) >= 0 && cmp(ar[0], rt, arg) >= 0) {
+		if (cmp(ar[0], lf, arg) >= 0 && cmp(ar[0], rt, arg) >= 0)
+		{
 			break;
 		}
-		if(cmp(lf, rt, arg) >= 0) {
+		if (cmp(lf, rt, arg) >= 0)
+		{
 			ar[i++] = lf;
 			head = lf;
 			pshift -= 1;
-		} else {
+		}
+		else
+		{
 			ar[i++] = rt;
 			head = rt;
 			pshift -= 2;
@@ -116,10 +197,27 @@ static void sift(unsigned char *head, size_t width, cmpfun cmp, void *arg, int p
 	cycle(width, ar, i);
 }
 
+/**
+ * @brief Performs the trinkle operation as part of the smoothsort algorithm.
+ *
+ * This function is used internally by the smoothsort algorithm to maintain the
+ * heap property of the array being sorted. It adjusts the position of the
+ * element at the given head pointer by comparing it with its "stepson" and
+ * potentially other elements, and then performing necessary swaps.
+ *
+ * @param head Pointer to the current element in the array.
+ * @param width Size of each element in the array.
+ * @param cmp Comparison function used to compare two elements.
+ * @param arg Additional argument passed to the comparison function.
+ * @param pp Array representing the current position in the Leonardo heap.
+ * @param pshift Current shift value in the Leonardo heap.
+ * @param trusty Flag indicating whether the current element is in a trusted position.
+ * @param lp Array of Leonardo numbers used in the smoothsort algorithm.
+ */
 static void trinkle(unsigned char *head, size_t width, cmpfun cmp, void *arg, size_t pp[2], int pshift, int trusty, size_t lp[])
 {
 	unsigned char *stepson,
-	              *rt, *lf;
+		*rt, *lf;
 	size_t p[2];
 	unsigned char *ar[14 * sizeof(size_t) + 1];
 	int i = 1;
@@ -129,15 +227,19 @@ static void trinkle(unsigned char *head, size_t width, cmpfun cmp, void *arg, si
 	p[1] = pp[1];
 
 	ar[0] = head;
-	while(p[0] != 1 || p[1] != 0) {
+	while (p[0] != 1 || p[1] != 0)
+	{
 		stepson = head - lp[pshift];
-		if(cmp(stepson, ar[0], arg) <= 0) {
+		if (cmp(stepson, ar[0], arg) <= 0)
+		{
 			break;
 		}
-		if(!trusty && pshift > 1) {
+		if (!trusty && pshift > 1)
+		{
 			rt = head - width;
 			lf = head - width - lp[pshift - 2];
-			if(cmp(rt, stepson, arg) >= 0 || cmp(lf, stepson, arg) >= 0) {
+			if (cmp(rt, stepson, arg) >= 0 || cmp(lf, stepson, arg) >= 0)
+			{
 				break;
 			}
 		}
@@ -149,45 +251,72 @@ static void trinkle(unsigned char *head, size_t width, cmpfun cmp, void *arg, si
 		pshift += trail;
 		trusty = 0;
 	}
-	if(!trusty) {
+	if (!trusty)
+	{
 		cycle(width, ar, i);
 		sift(head, width, cmp, arg, pshift, lp);
 	}
 }
 
+/**
+ * @brief Sorts an array using a variant of the smoothsort algorithm.
+ *
+ * This function sorts an array of elements using a comparison function provided by the user.
+ * It is a variant of the smoothsort algorithm, which is an adaptive sorting algorithm.
+ *
+ * @param base Pointer to the base of the array to be sorted.
+ * @param nel Number of elements in the array.
+ * @param width Size of each element in the array.
+ * @param cmp Comparison function that determines the order of the elements.
+ *            It should return a negative value if the first argument is less than the second,
+ *            zero if they are equal, and a positive value if the first argument is greater than the second.
+ * @param arg Additional argument to be passed to the comparison function.
+ */
 void __qsort_r(void *base, size_t nel, size_t width, cmpfun cmp, void *arg)
 {
-	size_t lp[12*sizeof(size_t)];
+	size_t lp[12 * sizeof(size_t)];
 	size_t i, size = width * nel;
 	unsigned char *head, *high;
 	size_t p[2] = {1, 0};
 	int pshift = 1;
 	int trail;
 
-	if (!size) return;
+	if (!size)
+		return;
 
 	head = base;
 	high = head + size - width;
 
 	/* Precompute Leonardo numbers, scaled by element width */
-	for(lp[0]=lp[1]=width, i=2; (lp[i]=lp[i-2]+lp[i-1]+width) < size; i++);
+	for (lp[0] = lp[1] = width, i = 2; (lp[i] = lp[i - 2] + lp[i - 1] + width) < size; i++)
+		;
 
-	while(head < high) {
-		if((p[0] & 3) == 3) {
+	while (head < high)
+	{
+		if ((p[0] & 3) == 3)
+		{
 			sift(head, width, cmp, arg, pshift, lp);
 			shr(p, 2);
 			pshift += 2;
-		} else {
-			if(lp[pshift - 1] >= high - head) {
+		}
+		else
+		{
+			if (lp[pshift - 1] >= high - head)
+			{
 				trinkle(head, width, cmp, arg, p, pshift, 0, lp);
-			} else {
+			}
+			else
+			{
 				sift(head, width, cmp, arg, pshift, lp);
 			}
 
-			if(pshift == 1) {
+			if (pshift == 1)
+			{
 				shl(p, 1);
 				pshift = 0;
-			} else {
+			}
+			else
+			{
 				shl(p, pshift - 1);
 				pshift = 1;
 			}
@@ -199,12 +328,16 @@ void __qsort_r(void *base, size_t nel, size_t width, cmpfun cmp, void *arg)
 
 	trinkle(head, width, cmp, arg, p, pshift, 0, lp);
 
-	while(pshift != 1 || p[0] != 1 || p[1] != 0) {
-		if(pshift <= 1) {
+	while (pshift != 1 || p[0] != 1 || p[1] != 0)
+	{
+		if (pshift <= 1)
+		{
 			trail = pntz(p);
 			shr(p, trail);
 			pshift += trail;
-		} else {
+		}
+		else
+		{
 			shl(p, 2);
 			pshift -= 2;
 			p[0] ^= 7;
